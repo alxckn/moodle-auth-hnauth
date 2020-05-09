@@ -2,8 +2,6 @@
 
 namespace auth_hnauth\business;
 
-use auth_hnauth\business\RegisterUser;
-
 class Logon implements Business
 {
 
@@ -16,14 +14,23 @@ class Logon implements Business
     {
         try {
             global $CFG;
-            $token = (new Input())->getTokenByUri($uri);
-            if ($data = (new Token())->decode($token)) {
-                $this->logon('admin');
-                $this->logon((new RegisterUser())->put($data));
+
+            $params = [];
+            if ($query = parse_url($uri, PHP_URL_QUERY)) {
+                parse_str($query, $params);
             }
-            redirect($CFG->wwwroot);
+
+            $token = $params['token'] ?? null;
+            if ($data = (new Token())->decode($token)) {
+                $this->logon($data->username);
+            }
+
+            if ($params['wantsurl'] ?? false) {
+                redirect($params['wantsurl']);
+            } else {
+                redirect($CFG->wwwroot);
+            }
         } catch (\Exception $ex) {
-            \core\session\manager::kill_all_sessions();
             throw $ex;
         }
     }
@@ -31,17 +38,9 @@ class Logon implements Business
     private function logon($username)
     {
         try {
-            global $CFG;
-            $auth = false;
             if ($user = get_complete_user_data('username', $username)) {
-                if (complete_user_login($user)) {
-                    $auth = true;
-                }
+                return complete_user_login($user);
             }
-            if (!$auth) {
-                \core\session\manager::kill_all_sessions();
-            }
-            return $auth;
         } catch (\Exception $ex) {
             throw $ex;
         }
